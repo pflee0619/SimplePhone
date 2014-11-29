@@ -4,6 +4,17 @@ var active_call = null;
 var registered = false;
 var callStart = 0;
 
+(function(){
+  chrome.runtime.onConnectExternal.addListener(function(port) {
+    port.onMessage.addListener(function(msg) {
+      console.log(msg);
+      if(msg.called) {
+        $("#display").val(msg.called);
+        $('#dialbtn').click();
+      }
+    });
+  });
+})();
 /**
  * Initialize sip stack
  */
@@ -47,22 +58,22 @@ function createSipStack() {
 					selfView.volume = 0;
 				} else {
 				    	console.warn('No local stream!');
-				} 
+				}
 				if ( active_call.getRemoteStreams().length > 0) {
 					console.debug('Start remote audio stream');
 					var remoteView = document.getElementById('remoteView');
 					remoteView.src = window.URL.createObjectURL(active_call.getRemoteStreams()[0]);
 				}
 				moveUIToState('incall');
-				
+
 			});
 			active_call.on('ended', function(e) {
 				console.debug("Call terminated");
 				moveUIToState('phone');
-				active_call = null;	
+				active_call = null;
 				chrome.notifications.clear("ring", function() {});
 			});
-			
+
 			// ui
 			if(e.data.session.direction === 'incoming') {
 				moveUIToState('incoming');
@@ -85,7 +96,7 @@ function createSipStack() {
 			e.data.session.terminate({status_code: 486});
 		}
 	});
-	sipStack.on('registered', 
+	sipStack.on('registered',
 			function(e) {
 				console.debug("Registered.");
 				if(!registered) {
@@ -96,7 +107,7 @@ function createSipStack() {
 						message: "Ready to receive calls",
 						iconUrl: "registered.png"
 					};
-					chrome.notifications.create("reg", opt, 
+					chrome.notifications.create("reg", opt,
 							function() {
 								setTimeout(function() { chrome.notifications.clear("reg", function() {}); }, 5000);
 							}
@@ -106,7 +117,7 @@ function createSipStack() {
 	);
 	sipStack.on('unregistered', function(e){ console.debug("Unregistered."); });
 	sipStack.on('registrationFailed', function(e){ console.debug("Registration failed."); });
-	
+
 	console.info("Starting stack ...");
 	sipStack.start();
 }
@@ -122,7 +133,7 @@ function moveUIToState(panel) {
 		$('#incoming div.caller div.name').html(active_call.remote_identity.display_name);
 		$('#incoming div.caller div.number').html(active_call.remote_identity.uri.toString());
 		$('#incoming').animate({'right': '0px'}, 200);
-	
+
 	} else if (panel === 'calling') {
 		$('#incoming').css('right', '240px');
 		$('#incall div.tools').html('Calling to');
@@ -165,7 +176,7 @@ function padZero(i) {
 
 function accept() {
 	if (active_call !== null) {
-		active_call.answer({mediaConstraints: {audio: true, video: true}});
+		active_call.answer({mediaConstraints: {audio: true, video: $("#video").attr("checked")}});
 	}
 }
 
@@ -191,7 +202,7 @@ $(document).ready(function() {
 			var eventHandlers = {};
 			var options = {
 				'eventHandlers': eventHandlers,
-				'mediaConstraints': {audio: true, video: true}
+				'mediaConstraints': {audio: true, video: $("#video").attr("checked")}
 			};
 			sipStack.call($('#display').val(), options);
  		} else {
@@ -199,28 +210,28 @@ $(document).ready(function() {
 			active_call.terminate();
 		}
 	});
-	$('#dialbtn').mousedown(function() { 
+	$('#dialbtn').mousedown(function() {
 		$('#dialbtn').removeClass('dial');
 		$('#dialbtn').addClass('dial_pressed');
 	});
-	$('#dialbtn').mouseup(function() { 
+	$('#dialbtn').mouseup(function() {
 		$('#dialbtn').removeClass('dial_pressed');
 		$('#dialbtn').addClass('dial');
 	});
-	$('#dialbtn').mouseout(function() { 
+	$('#dialbtn').mouseout(function() {
 		$('#dialbtn').removeClass('dial_pressed');
 		$('#dialbtn').addClass('dial');
 	});
 
-	$('#hangup').mousedown(function() { 
+	$('#hangup').mousedown(function() {
 		$('#hangup').removeClass('hangup');
 		$('#hangup').addClass('hangup_pressed');
 	});
-	$('#hangup').mouseup(function() { 
+	$('#hangup').mouseup(function() {
 		$('#hangup').removeClass('hangup_pressed');
 		$('#hangup').addClass('hangup');
 	});
-	$('#hangup').mouseout(function() { 
+	$('#hangup').mouseout(function() {
 		$('#hangup').removeClass('hangup_pressed');
 		$('#hangup').addClass('hangup');
 	});
@@ -234,7 +245,7 @@ $(document).ready(function() {
 		console.debug('Save settings ...');
 		chrome.storage.sync.set(
 			{'url':$('#url').val(),'user':$('#user').val(),'pass':$('#pass').val()},
-			function() { 
+			function() {
 				console.debug('Settings succesfully saved.');
 				$('#settings').css('top', '360px');
 			}
@@ -265,8 +276,8 @@ $(document).ready(function() {
 
 	// load configuration
 	console.info("Loading shared config ...");
-	chrome.storage.sync.get(null, 
-		function(items) { 
+	chrome.storage.sync.get(null,
+		function(items) {
 			console.debug("Config loaded: " + JSON.stringify(items));
 			config = items;
 			if(config.url)
@@ -275,7 +286,7 @@ $(document).ready(function() {
 				$('#user').val(config.user);
 			if(config.pass)
 				$('#pass').val(config.pass);
-			
+
 			createSipStack();
 		}
 	);
